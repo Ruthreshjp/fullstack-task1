@@ -130,26 +130,30 @@ function Login({ setIsLoggedIn, setUserRole }) {
           <br />
 
           <div>
-            <label>Role (admin/user):</label>
+            <label>Select Role:</label>
             <br />
-            <input
-              type="text"
+            <select
               style={styles.input}
               value={role}
               onChange={(e) => setRole(e.target.value)}
-            />
+              required
+            >
+              <option value="">Select Role</option>
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
           </div>
 
           <button
             type="submit"
-            style={{ ...styles.button, ...styles.loginBtn }}
+            style={styles.button}
           >
             Login
           </button>
 
           <button
             type="button"
-            style={{ ...styles.button, ...styles.registerBtn }}
+            style={styles.button}
             onClick={() => navigate("/register")}
           >
             Register
