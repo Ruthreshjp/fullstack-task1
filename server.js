@@ -29,16 +29,30 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model("User", UserSchema);
 app.post("/register", async (req, res) => {
-  const { username, password, role } = req.body;
+  try {
+    const { username, password, role } = req.body;
 
-  const roleEntered = (role || "user").toLowerCase();
-  const finalRole = roleEntered === "admin" ? "admin" : "user";
+    if (!username || !password) {
+      return res.status(400).json({ message: "Username and password are required" });
+    }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const user = new User({ username, password: hashedPassword, role: finalRole });
-  await user.save();
+    const normalizedRole = role && typeof role === "string" ? role.trim().toLowerCase() : "user";
+    const finalRole = ["admin", "user"].includes(normalizedRole) ? normalizedRole : "user";
 
-  res.status(201).json({ message: "User registered" });
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+      return res.status(409).json({ message: "Username already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = new User({ username, password: hashedPassword, role: finalRole });
+    await user.save();
+
+    res.status(201).json({ message: "User registered", role: finalRole });
+  } catch (error) {
+    console.error("Registration error:", error);
+    res.status(500).json({ message: "Error registering user" });
+  }
 });
 
 app.post("/login", async (req, res) => {
