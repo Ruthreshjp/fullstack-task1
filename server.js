@@ -20,38 +20,52 @@ mongoose
   .catch((err) => console.error(err));
 const UserSchema = new mongoose.Schema({
   username: String,
-  password: String
+  password: String,
+  role: {
+    type: String,
+    enum: ["admin", "user"],
+    default: "user"
+  }
 });
 const User = mongoose.model("User", UserSchema);
 app.post("/register", async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, role } = req.body;
+
+  const roleEntered = (role || "user").toLowerCase();
+  const finalRole = roleEntered === "admin" ? "admin" : "user";
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  const user = new User({ username, password: hashedPassword });
+  const user = new User({ username, password: hashedPassword, role: finalRole });
   await user.save();
 
   res.status(201).json({ message: "User registered" });
 });
 
 app.post("/login", async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, role } = req.body;
+
+  const Loginrole = role ? role.toLowerCase() : undefined;
 
   const user = await User.findOne({ username });
   if (!user) return res.status(400).json({ message: "Invalid username" });
 
+  if (Loginrole && user.role !== Loginrole) {
+    return res.status(403).json({ message: "Invalid role" });
+  }
+
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) return res.status(400).json({ message: "Invalid password" });
 
-  const token = jwt.sign({ userId: user._id }, JWT_SECRET, {
+  const authToken = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, {
     expiresIn: "1h"
   });
 
-  res.cookie("token", token, {
+  res.cookie("token", authToken, {
     httpOnly: true,
-    expiresIn : "10h"
+    maxAge: 60 * 60 * 1000
   });
 
-  res.status(200).json({ message: "Login successful" });
+  res.status(200).json({ message: "Login successful", role: user.role, token: authToken });
 });
 
 app.get("/dashboard", (req, res) => {
@@ -61,15 +75,22 @@ app.get("/dashboard", (req, res) => {
   }
 
   try {
-    jwt.verify(token, JWT_SECRET);
-    res.json({ message: "Welcome user" });
+    const decodedToken = jwt.verify(token, JWT_SECRET);
+
+    if (decodedToken.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    res.json({ message: "Welcome admin" });
   } catch (err) {
     res.status(401).json({ message: "Invalid token" });
   }
 });
 
 app.post("/logout", (req, res) => {
-  res.clearCookie("token");
+  res.clearCookie("token", {
+    httpOnly: true,
+  });
   res.json({ message: "Logged out" });
 });
 
